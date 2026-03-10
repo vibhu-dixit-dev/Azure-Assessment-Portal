@@ -69,7 +69,7 @@ Connect-AzAccount | Out-Null
 
 $results = @()
 $sub     = Get-AzSubscription | Select-Object -First 1
-$date    = Get-Date -Format "yyyy-MM-dd HH:mm"
+$date    = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
 $subName = $sub.Name
 
 Write-Host "Running IAM checks on: $subName" -ForegroundColor Yellow
