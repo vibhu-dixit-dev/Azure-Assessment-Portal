@@ -6,7 +6,7 @@
 //  Example: https://raw.githubusercontent.com/YourUser/YourRepo/main/scripts
 // ─────────────────────────────────────────────────────────────
 
-const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/scripts";
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/vibhu-dixit-dev/Azure-Assessment-Portal/main/scripts";
 
 // ── Checklist definitions ──────────────────────────────────────
 const CHECKLISTS = {
