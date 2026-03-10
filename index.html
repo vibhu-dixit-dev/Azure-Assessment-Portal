@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Azure Cloud Assessment Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <path d="M16 2L2 10v12l14 8 14-8V10L16 2z" fill="url(#g1)" />
+                        <defs>
+                            <linearGradient id="g1" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#0078D4" />
+                                <stop offset="1" stop-color="#50E6FF" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <span class="brand-name">Azure Assessment Portal</span>
+                    <span class="brand-sub">Cloud Security Automation</span>
+                </div>
+            </div>
+            <div class="header-badge">
+                <span class="badge-dot"></span>
+                Powered by PowerShell
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                Azure Cloud <span class="gradient-text">Security Assessment</span>
+            </h1>
+            <p class="hero-subtitle">
+                Select a checklist, copy the one-liner, paste it in Azure Cloud Shell — get a full professional HTML
+                security report on your laptop.
+            </p>
+            <div class="hero-steps">
+                <div class="step"><span class="step-num">1</span><span>Select Checklist</span></div>
+                <div class="step-arrow">→</div>
+                <div class="step"><span class="step-num">2</span><span>Copy Command</span></div>
+                <div class="step-arrow">→</div>
+                <div class="step"><span class="step-num">3</span><span>Paste in Cloud Shell</span></div>
+                <div class="step-arrow">→</div>
+                <div class="step"><span class="step-num">4</span><span>Download HTML Report</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Checklist Cards -->
+    <section class="checklists-section">
+        <div class="section-header">
+            <h2>Select Your Assessment Checklist</h2>
+            <p>Choose a category — a one-line PowerShell command will be generated for you</p>
+        </div>
+        <div class="cards-grid" id="cardsGrid">
+
+            <!-- Card 1: IAM -->
+            <div class="card" data-checklist="iam" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#0078D4,#0050c8)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path
+                            d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zm2 14H10v-1h4v1zm1.28-4.51A4.946 4.946 0 0117 9c0-2.76-2.24-5-5-5S7 6.24 7 9c0 1.8.96 3.38 2.38 4.26L9 14h6l-.28-.4c-.1-.15.06-.33.56-.11z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">IAM &amp; Identity Audit</h3>
+                <p class="card-desc">Assess users, roles, MFA status, privileged access, service principals and guest
+                    accounts in Azure Active Directory.</p>
+                <div class="card-tags">
+                    <span class="tag">MFA</span><span class="tag">RBAC</span><span class="tag">Service
+                        Principals</span><span class="tag">Guest Users</span>
+                </div>
+                <div class="card-checks">12 checks</div>
+            </div>
+
+            <!-- Card 2: Storage -->
+            <div class="card" data-checklist="storage" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#00b294,#007a63)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path d="M20 6H4V4h16v2zm0 2H4v2h16V8zm-8 4H4v6h8v-6zm1 6h7v-6h-7v6z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">Storage Security Audit</h3>
+                <p class="card-desc">Check storage account encryption, public access, network rules, HTTPS enforcement
+                    and soft delete policy.</p>
+                <div class="card-tags">
+                    <span class="tag">Encryption</span><span class="tag">Public Access</span><span
+                        class="tag">HTTPS</span><span class="tag">Soft Delete</span>
+                </div>
+                <div class="card-checks">10 checks</div>
+            </div>
+
+            <!-- Card 3: Network -->
+            <div class="card" data-checklist="network" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#e74c3c,#a93226)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path
+                            d="M17 8C8 10 5.9 16.17 3.82 21H5.5c.56-1.21 1.21-2.39 1.92-3.5H11v2h2v-2h3.58c.23.74.42 1.55.42 2.5v.5H19v-.5c0-2.44-.86-4.68-2-6.5zm-2.5 6.5H11v-2h3.5v2zm-5 0H8c.37-.73.8-1.41 1.3-2h.2v2zm6.25-8.08C14.5 5.28 13.44 4 12 4s-2.5 1.28-2.75 3.42l-2-.96C7.74 3.38 9.66 2 12 2s4.26 1.38 4.75 4.46l-2 .96z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">Network Security Audit</h3>
+                <p class="card-desc">Review NSGs, open ports, public IPs, VNet peering, Azure Firewall and DDoS
+                    protection settings.</p>
+                <div class="card-tags">
+                    <span class="tag">NSG</span><span class="tag">Public IPs</span><span
+                        class="tag">Firewall</span><span class="tag">DDoS</span>
+                </div>
+                <div class="card-checks">14 checks</div>
+            </div>
+
+            <!-- Card 4: VM Security -->
+            <div class="card" data-checklist="vm" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#9b59b6,#7d3c98)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path
+                            d="M20 3H4C2.9 3 2 3.9 2 5v10c0 1.1.9 2 2 2h7v2H9v2h6v-2h-2v-2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12H4V5h16v10z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">Virtual Machine Security</h3>
+                <p class="card-desc">Audit VM disk encryption, OS updates, endpoint protection (Defender), managed
+                    identity and JIT access.</p>
+                <div class="card-tags">
+                    <span class="tag">Disk Encryption</span><span class="tag">Defender</span><span
+                        class="tag">JIT</span><span class="tag">Updates</span>
+                </div>
+                <div class="card-checks">11 checks</div>
+            </div>
+
+            <!-- Card 5: Defender & Monitoring -->
+            <div class="card" data-checklist="defender" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#f39c12,#d68910)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path
+                            d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14l-3-3 1.41-1.41L11 12.17l4.59-4.59L17 9l-6 6z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">Defender &amp; Monitoring</h3>
+                <p class="card-desc">Check Microsoft Defender for Cloud plans, security alerts, Diagnostic settings, and
+                    Log Analytics workspace configuration.</p>
+                <div class="card-tags">
+                    <span class="tag">Defender</span><span class="tag">Alerts</span><span class="tag">Log
+                        Analytics</span><span class="tag">Diagnostics</span>
+                </div>
+                <div class="card-checks">9 checks</div>
+            </div>
+
+            <!-- Card 6: Full Compliance -->
+            <div class="card" data-checklist="full" onclick="selectCard(this)">
+                <div class="card-icon" style="background:linear-gradient(135deg,#1abc9c,#148f77)">
+                    <svg viewBox="0 0 24 24" fill="white">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                </div>
+                <h3 class="card-title">Full Compliance Assessment</h3>
+                <p class="card-desc">Comprehensive audit covering IAM, Storage, Network, VMs, Defender, Key Vault and
+                    Subscriptions — all in one report.</p>
+                <div class="card-tags">
+                    <span class="tag">CIS Benchmark</span><span class="tag">Full Audit</span><span class="tag">All
+                        Services</span><span class="tag">Report</span>
+                </div>
+                <div class="card-checks">50+ checks</div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Command Section (hidden by default) -->
+    <section class="script-section" id="scriptSection">
+        <div class="script-container">
+
+            <div class="script-header">
+                <div>
+                    <h2 id="scriptTitle">Run Assessment</h2>
+                    <p id="scriptDesc">Copy the command and paste it in Azure Cloud Shell</p>
+                </div>
+                <div class="script-actions">
+                    <button class="btn-secondary" onclick="closeScript()">✕ Close</button>
+                    <button class="btn-azure" onclick="openCloudShell()">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path
+                                d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zM6 10h2v2H6zm4 0h8v2h-8zm-4 4h2v2H6zm4 0h6v2h-6z" />
+                        </svg>
+                        Open Azure Cloud Shell
+                    </button>
+                </div>
+            </div>
+
+            <!-- How-to steps -->
+            <div class="instructions-box">
+                <div class="instructions-icon">⚡</div>
+                <div>
+                    <strong>3 steps to get your report:</strong>
+                    <ol>
+                        <li>Click <strong>"Open Azure Cloud Shell"</strong> → Azure Portal opens, login to your account
+                        </li>
+                        <li>Click the <strong style="color:#50e6ff">Copy</strong> button → paste in Cloud Shell → press
+                            <strong>Enter</strong></li>
+                        <li>When done, click <strong>↑↓</strong> in Cloud Shell toolbar → <em>Download</em> → type:
+                            <code id="reportFileName">report.html</code></li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- One-liner command box -->
+            <div class="command-section">
+                <div class="command-label">
+                    <span class="code-lang">PowerShell — Paste in Azure Cloud Shell</span>
+                    <a id="ps1FileLink" href="#" target="_blank" class="ps1-link">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+                            <path
+                                d="M14 3H6C4.9 3 4 3.9 4 5v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-6-6zm4 16H6V5h7v5h5v9z" />
+                        </svg>
+                        View .ps1 file on GitHub ↗
+                    </a>
+                </div>
+                <div class="command-box">
+                    <pre class="command-pre"><code id="commandLine"></code></pre>
+                    <button class="copy-inline-btn" onclick="copyCommand()" id="copyBtn" title="Copy command">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path
+                                d="M16 1H4C3 1 2 2 2 3v14h2V3h12V1zm3 4H8C7 5 6 6 6 7v14c0 1 1 2 2 2h11c1 0 2-1 2-2V7c0-1-1-2-2-2zm0 16H8V7h11v14z" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="command-hint">⚡ One command pulls the full script from GitHub and runs it automatically — no
+                    copy-pasting 100+ lines.</p>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Built for Azure Cloud Security Assessments &nbsp;|&nbsp; Powered by PowerShell Automation</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>
