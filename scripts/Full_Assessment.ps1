@@ -37,10 +37,16 @@ $results += [PSCustomObject]@{ Category="Subscription"; Check="Active Context"; 
 # ── IAM
 Write-Host "[1/6] IAM Checks..." -ForegroundColor Cyan
 try {
-    $guests = Get-AzADUser -All $true | Where-Object { $_.UserType -eq "Guest" }
-    $results += [PSCustomObject]@{ Category="IAM"; Check="Guest Users"; Resource="Tenant"; Status=if($guests){"WARN"}else{"PASS"}; Details=if($guests){"$($guests.Count) guest user(s) found"}else{"No guest users"} }
-    $owners = Get-AzRoleAssignment | Where-Object { $_.RoleDefinitionName -eq "Owner" }
-    $results += [PSCustomObject]@{ Category="IAM"; Check="Owner Assignments"; Resource="Subscription"; Status=if($owners.Count -gt 3){"WARN"}else{"PASS"}; Details="$($owners.Count) Owner role(s) assigned" }
+    # MFA Sampling
+    $privRoles = @("Owner","Global Administrator")
+    $roleAssignments = Get-AzRoleAssignment -ErrorAction SilentlyContinue | Where-Object { $privRoles -contains $_.RoleDefinitionName }
+    foreach ($role in $roleAssignments) {
+        $results += [PSCustomObject]@{ Category="IAM"; Check="Privileged MFA"; Resource=$role.DisplayName; Status="WARN"; Details="Verify MFA for $($role.RoleDefinitionName)" }
+    }
+    
+    # Password Reset & External Access
+    $results += [PSCustomObject]@{ Category="IAM"; Check="Guest Invitations"; Resource="Tenant"; Status="WARN"; Details="Restrict guest & member invitation capabilities" }
+    $results += [PSCustomObject]@{ Category="IAM"; Check="Password Reset Policy"; Resource="Tenant"; Status="WARN"; Details="Ensure notify users/admins on reset is enabled" }
 } catch { $results += [PSCustomObject]@{ Category="IAM"; Check="IAM Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
 
 # ── Storage
