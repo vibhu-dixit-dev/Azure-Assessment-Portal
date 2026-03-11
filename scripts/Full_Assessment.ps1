@@ -109,9 +109,7 @@ $html = Get-HtmlTemplate -Title "Full Compliance Assessment" -SubName $subName -
 $html | Out-File "AzureFullAssessment_Report.html" -Encoding UTF8
 Write-Host ""; Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host " ✅ Full Assessment Complete!" -ForegroundColor Green
+Write-Host " 📥 Downloading report automatically..." -ForegroundColor Yellow
 Write-Host " Report: AzureFullAssessment_Report.html" -ForegroundColor Green
-Write-Host ""; Write-Host " DOWNLOAD TO YOUR LAPTOP:" -ForegroundColor Yellow
-Write-Host " 1. Click the [ ↑↓ ] icon in Cloud Shell toolbar" -ForegroundColor White
-Write-Host " 2. Select 'Download a file'" -ForegroundColor White
-Write-Host " 3. Enter: AzureFullAssessment_Report.html" -ForegroundColor White
 Write-Host "==================================================" -ForegroundColor Cyan
+download AzureFullAssessment_Report.html

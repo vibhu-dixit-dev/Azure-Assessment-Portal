@@ -133,9 +133,6 @@ $html | Out-File "AzureIAM_Report.html" -Encoding UTF8
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " ✅ Report Ready: AzureIAM_Report.html" -ForegroundColor Green
-Write-Host ""
-Write-Host " DOWNLOAD TO YOUR LAPTOP:" -ForegroundColor Yellow
-Write-Host " 1. Click the [ ↑↓ ] icon in Cloud Shell toolbar" -ForegroundColor White
-Write-Host " 2. Select 'Download a file'" -ForegroundColor White
-Write-Host " 3. Enter: AzureIAM_Report.html" -ForegroundColor White
+Write-Host " 📥 Downloading automatically..." -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
+download AzureIAM_Report.html

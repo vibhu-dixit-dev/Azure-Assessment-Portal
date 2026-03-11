@@ -56,10 +56,8 @@ $pass=$($results|Where-Object Status -eq "PASS").Count; $fail=$($results|Where-O
 $warn=$($results|Where-Object Status -eq "WARN").Count; $total=$results.Count
 $html = Get-HtmlTemplate -Title "Storage Security Audit" -SubName $subName -Date $date -Rows $rows -Pass $pass -Fail $fail -Warn $warn -Total $total
 $html | Out-File "AzureStorage_Report.html" -Encoding UTF8
-Write-Host ""; Write-Host "============================================" -ForegroundColor Cyan
-Write-Host " ✅ Report Ready: AzureStorage_Report.html" -ForegroundColor Green
-Write-Host ""; Write-Host " DOWNLOAD TO YOUR LAPTOP:" -ForegroundColor Yellow
-Write-Host " 1. Click the [ ↑↓ ] icon in Cloud Shell toolbar" -ForegroundColor White
-Write-Host " 2. Select 'Download a file'" -ForegroundColor White
-Write-Host " 3. Enter: AzureStorage_Report.html" -ForegroundColor White
 Write-Host "============================================" -ForegroundColor Cyan
+Write-Host " ✅ Report Ready: AzureStorage_Report.html" -ForegroundColor Green
+Write-Host " 📥 Downloading automatically..." -ForegroundColor Yellow
+Write-Host "============================================" -ForegroundColor Cyan
+download AzureStorage_Report.html
