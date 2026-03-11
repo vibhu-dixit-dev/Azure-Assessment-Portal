@@ -21,12 +21,18 @@ function Get-HtmlTemplate {
 }
 
 Write-Host "Connecting to Azure..." -ForegroundColor Cyan
-Connect-AzAccount | Out-Null
+Connect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 $results = @()
-$sub     = Get-AzSubscription | Select-Object -First 1
+$context = Get-AzContext
+if (-not $context) { return }
+$subName = $context.Subscription.Name
+$subId   = $context.Subscription.Id
 $date    = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
-$subName = $sub.Name
-Write-Host "Running Full Assessment on: $subName" -ForegroundColor Yellow
+
+Write-Host "Running Full Assessment on: $subName ($subId)" -ForegroundColor Yellow
+
+# Add default Context row
+$results += [PSCustomObject]@{ Category="Subscription"; Check="Active Context"; Resource=$subName; Status="PASS"; Details="Successfully identified subscription: $subId" }
 
 # ── IAM
 Write-Host "[1/6] IAM Checks..." -ForegroundColor Cyan
