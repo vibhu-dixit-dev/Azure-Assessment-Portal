@@ -36,7 +36,7 @@ const CHECKLISTS = {
     },
 
     vm: {
-        title: "Virtual Machine Security",
+        title: "Compute Audit",
         desc: "Audits disk encryption, Defender, managed identity & JIT access",
         file: "VM_Audit.ps1",
         report: "AzureVM_Report.html",
