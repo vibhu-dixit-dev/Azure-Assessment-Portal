@@ -60,17 +60,35 @@ try {
     $results += [PSCustomObject]@{ Category="Network"; Check="Public IPs Count"; Resource="Subscription"; Status=if($pips.Count -gt 5){"WARN"}else{"INFO"}; Details="$($pips.Count) public IP(s) found" }
 } catch { $results += [PSCustomObject]@{ Category="Network"; Check="Network Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
 
-# ── VMs
-Write-Host "[4/6] VM Checks..." -ForegroundColor Cyan
+# ── Compute & Services (VMs, App Service, AKS, etc.)
+Write-Host "[4/6] Compute & Services..." -ForegroundColor Cyan
 try {
+    # VMs & Scale Sets
     $vms = Get-AzVM
     foreach ($vm in $vms) {
-        $enc = Get-AzVMDiskEncryptionStatus -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction SilentlyContinue
-        $results += [PSCustomObject]@{ Category="VM"; Check="Disk Encryption"; Resource=$vm.Name; Status=if($enc.OsVolumeEncrypted -eq "Encrypted"){"PASS"}else{"FAIL"}; Details="OS Disk: $($enc.OsVolumeEncrypted)" }
-        $results += [PSCustomObject]@{ Category="VM"; Check="Managed Identity"; Resource=$vm.Name; Status=if($vm.Identity){"PASS"}else{"WARN"}; Details=if($vm.Identity){"Identity: $($vm.Identity.Type)"}else{"No managed identity"} }
+        $name = $vm.Name; $rg = $vm.ResourceGroupName
+        $enc = Get-AzVMDiskEncryptionStatus -ResourceGroupName $rg -VMName $name -ErrorAction SilentlyContinue
+        $results += [PSCustomObject]@{ Category="Compute"; Check="Disk Encryption"; Resource=$name; Status=if($enc.OsVolumeEncrypted -eq "Encrypted"){"PASS"}else{"FAIL"}; Details="OS Disk: $($enc.OsVolumeEncrypted)" }
+        $results += [PSCustomObject]@{ Category="Compute"; Check="Managed Identity"; Resource=$name; Status=if($vm.Identity){"PASS"}else{"WARN"}; Details=if($vm.Identity){"Identity: $($vm.Identity.Type)"}else{"No managed identity"} }
+        if ($vm.StorageProfile.OsDisk.OsType -eq "Linux") {
+            $results += [PSCustomObject]@{ Category="Compute"; Check="SSH Auth Type"; Resource=$name; Status=if($vm.OSProfile.LinuxConfiguration.DisablePasswordAuthentication){"PASS"}else{"FAIL"}; Details=if($vm.OSProfile.LinuxConfiguration.DisablePasswordAuthentication){"SSH Keys"}else{"Password allowed"} }
+        }
     }
-    if (-not $vms) { $results += [PSCustomObject]@{ Category="VM"; Check="VMs"; Resource="Subscription"; Status="INFO"; Details="No VMs found" } }
-} catch { $results += [PSCustomObject]@{ Category="VM"; Check="VM Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+    
+    # App Services
+    $webApps = Get-AzWebApp
+    foreach ($wa in $webApps) {
+        $results += [PSCustomObject]@{ Category="App Service"; Check="HTTPS-Only"; Resource=$wa.Name; Status=if($wa.HttpsOnly){"PASS"}else{"FAIL"}; Details="Redirect: $($wa.HttpsOnly)" }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="TLS Latest"; Resource=$wa.Name; Status=if($wa.SiteConfig.MinTlsVersion -ge "1.2"){"PASS"}else{"FAIL"}; Details="Min TLS: $($wa.SiteConfig.MinTlsVersion)" }
+    }
+
+    # AKS
+    $aksClusters = Get-AzAksCluster
+    foreach ($aks in $aksClusters) {
+        $results += [PSCustomObject]@{ Category="AKS"; Check="RBAC Enabled"; Resource=$aks.Name; Status=if($aks.EnableRbac){"PASS"}else{"FAIL"}; Details="RBAC: $($aks.EnableRbac)" }
+        $results += [PSCustomObject]@{ Category="AKS"; Check="Defender"; Resource=$aks.Name; Status=if($aks.SecurityProfile.Defender.SecurityMonitoring.Enabled){"PASS"}else{"FAIL"}; Details="Defender for AKS: $($aks.SecurityProfile.Defender.SecurityMonitoring.Enabled)" }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="Compute Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
 
 # ── Defender
 Write-Host "[5/6] Defender Checks..." -ForegroundColor Cyan

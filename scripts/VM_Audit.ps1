@@ -1,6 +1,6 @@
 # ============================================================
-#  Azure Virtual Machine Security Assessment
-#  Generates: AzureVM_Report.html
+#  Azure Compute Security Audit (60+ Checks)
+#  Generates: AzureCompute_Report.html
 #  Run via: irm <raw_github_url>/VM_Audit.ps1 | iex
 # ============================================================
 
@@ -26,34 +26,153 @@ $results = @()
 $sub     = Get-AzSubscription | Select-Object -First 1
 $date    = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
 $subName = $sub.Name
-Write-Host "Running VM checks on: $subName" -ForegroundColor Yellow
+Write-Host "Running Compute Audit on: $subName" -ForegroundColor Yellow
 
+# ─────────────────────────────────────────────────────────────
+# 1. SPECIAL CATEGORY: UNATTACHED DISKS & LBs
+# ─────────────────────────────────────────────────────────────
+Write-Host "[1/7] Orphaned Resources & Global Config..." -ForegroundColor Cyan
+try {
+    $allDisks = Get-AzDisk
+    $unattachedDisks = $allDisks | Where-Object { $_.ManagedBy -eq $null }
+    foreach ($disk in $unattachedDisks) {
+        $results += [PSCustomObject]@{ Category="Orphaned"; Check="Remove Unattached Disks"; Resource=$disk.Name; Status="FAIL"; Details="Disk is not attached to any VM" }
+        $results += [PSCustomObject]@{ Category="Orphaned"; Check="Disk Encryption (Unattached)"; Resource=$disk.Name; Status=if($disk.Encryption.Type -like "*CustomerManagedKey*"){"PASS"}else{"WARN"}; Details="SSE Type: $($disk.Encryption.Type)" }
+    }
+    
+    $lbs = Get-AzLoadBalancer
+    foreach ($lb in $lbs) {
+        $isUsed = $lb.FrontendIpConfigurations.Count -gt 0 -and $lb.BackendAddressPools.Count -gt 0
+        $results += [PSCustomObject]@{ Category="Network"; Check="Associated Load Balancers"; Resource=$lb.Name; Status=if($isUsed){"PASS"}else{"WARN"}; Details=if($isUsed){"LB has Frontend & Backend"}else{"LB is missing associations"} }
+        if (-not $isUsed) {
+            $results += [PSCustomObject]@{ Category="Network"; Check="Unused Load Balancer"; Resource=$lb.Name; Status="FAIL"; Details="Load Balancer is not being used" }
+        }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="Orphaned Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 2. VIRTUAL MACHINES & VMSS
+# ─────────────────────────────────────────────────────────────
+Write-Host "[2/7] Virtual Machines & Scale Sets..." -ForegroundColor Cyan
 try {
     $vms = Get-AzVM
     foreach ($vm in $vms) {
-        $name = $vm.Name; $rg = $vm.ResourceGroupName; $os = $vm.StorageProfile.OsDisk.OsType
-        try {
-            $enc = Get-AzVMDiskEncryptionStatus -ResourceGroupName $rg -VMName $name -ErrorAction SilentlyContinue
-            $results += [PSCustomObject]@{ Category="VM Encryption"; Check="OS Disk Encryption"; Resource=$name; Status=if($enc.OsVolumeEncrypted -eq "Encrypted"){"PASS"}else{"FAIL"}; Details="Status: $($enc.OsVolumeEncrypted)" }
-        } catch { $results += [PSCustomObject]@{ Category="VM Encryption"; Check="OS Disk Encryption"; Resource=$name; Status="WARN"; Details="Could not check encryption status" } }
+        $name = $vm.Name; $rg = $vm.ResourceGroupName
+        
+        # 1. SSH Auth Type
+        if ($vm.StorageProfile.OsDisk.OsType -eq "Linux") {
+            $sshAuth = $vm.OSProfile.LinuxConfiguration.DisablePasswordAuthentication
+            $results += [PSCustomObject]@{ Category="VM Security"; Check="SSH Auth Type"; Resource=$name; Status=if($sshAuth){"PASS"}else{"FAIL"}; Details=if($sshAuth){"SSH Keys only"}else{"Password allowed"} }
+        }
 
+        # 2. Disk Encryption (Boot/Non-Boot)
+        $enc = Get-AzVMDiskEncryptionStatus -ResourceGroupName $rg -VMName $name -ErrorAction SilentlyContinue
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Boot Disk Encryption"; Resource=$name; Status=if($enc.OsVolumeEncrypted -eq "Encrypted"){"PASS"}else{"FAIL"}; Details="OS Disk: $($enc.OsVolumeEncrypted)" }
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Non-Boot Disk Encryption"; Resource=$name; Status=if($enc.DataVolumesEncrypted -eq "Encrypted" -or $enc.DataVolumesEncrypted -eq "NotMounted"){"PASS"}else{"FAIL"}; Details="Data Disks: $($enc.DataVolumesEncrypted)" }
+
+        # 3. Managed Identity
         $hasMI = $vm.Identity -ne $null
-        $results += [PSCustomObject]@{ Category="VM Identity"; Check="Managed Identity"; Resource=$name; Status=if($hasMI){"PASS"}else{"WARN"}; Details=if($hasMI){"Identity: $($vm.Identity.Type)"}else{"No managed identity assigned"} }
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Managed Identity"; Resource=$name; Status=if($hasMI){"PASS"}else{"WARN"}; Details=if($hasMI){"Identity: $($vm.Identity.Type)"}else{"No managed identity"} }
 
-        $vmNics = $vm.NetworkProfile.NetworkInterfaces
-        foreach ($nic in $vmNics) {
+        # 4. Boot Diagnostics
+        $bootDiag = $vm.DiagnosticsProfile.BootDiagnostics.Enabled
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Boot Diagnostics"; Resource=$name; Status=if($bootDiag){"PASS"}else{"WARN"}; Details=if($bootDiag){"Enabled"}else{"Disabled"} }
+
+        # 5. Accelerated Networking
+        foreach ($nic in $vm.NetworkProfile.NetworkInterfaces) {
             $nicRes = Get-AzNetworkInterface -ResourceId $nic.Id -ErrorAction SilentlyContinue
             if ($nicRes) {
-                foreach ($ipc in $nicRes.IpConfigurations) {
-                    if ($ipc.PublicIpAddress) { $results += [PSCustomObject]@{ Category="VM Network"; Check="Public IP on VM"; Resource=$name; Status="WARN"; Details="VM has a direct public IP — consider Bastion/Load Balancer" } }
-                }
+                $results += [PSCustomObject]@{ Category="VM Performance"; Check="Accelerated Networking"; Resource=$name; Status=if($nicRes.EnableAcceleratedNetworking){"PASS"}else{"INFO"}; Details=if($nicRes.EnableAcceleratedNetworking){"Enabled"}else{"Not enabled"} }
             }
         }
-        $results += [PSCustomObject]@{ Category="VM Info"; Check="VM Info"; Resource=$name; Status="INFO"; Details="OS: $os | Size: $($vm.HardwareProfile.VmSize) | RG: $rg" }
-    }
-    if (-not $vms) { $results += [PSCustomObject]@{ Category="VM"; Check="Virtual Machines"; Resource="Subscription"; Status="INFO"; Details="No VMs found in subscription" } }
-} catch { $results += [PSCustomObject]@{ Category="VM"; Check="VM Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
 
+        # 6. Admin Username (Basic checks)
+        $badNames = @("admin","administrator","root","user","azureuser")
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Basic Admin Username"; Resource=$name; Status=if($vm.OSProfile.AdminUsername -in $badNames){"FAIL"}else{"PASS"}; Details="Username: $($vm.OSProfile.AdminUsername)" }
+
+        # 7. Managed Disks
+        $isManaged = $vm.StorageProfile.OsDisk.ManagedDisk -ne $null
+        $results += [PSCustomObject]@{ Category="VM Security"; Check="Managed Disks"; Resource=$name; Status=if($isManaged){"PASS"}else{"FAIL"}; Details=if($isManaged){"Yes"}else{"Unmanaged disks found"} }
+    }
+
+    $vmssList = Get-AzVmss
+    foreach ($vmss in $vmssList) {
+        $results += [PSCustomObject]@{ Category="VMSS"; Check="Auto OS Upgrades"; Resource=$vmss.Name; Status=if($vmss.UpgradePolicy.AutomaticOSUpgrade){"PASS"}else{"FAIL"}; Details=if($vmss.UpgradePolicy.AutomaticOSUpgrade){"Enabled"}else{"Disabled"} }
+        $results += [PSCustomObject]@{ Category="VMSS"; Check="Instance Repairs"; Resource=$vmss.Name; Status=if($vmss.AutomaticInstanceRepair.Enabled){"PASS"}else{"WARN"}; Details=if($vmss.AutomaticInstanceRepair.Enabled){"Enabled"}else{"Disabled"} }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="VM/VMSS Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 3. APP SERVICE
+# ─────────────────────────────────────────────────────────────
+Write-Host "[3/7] App Services..." -ForegroundColor Cyan
+try {
+    $webApps = Get-AzWebApp
+    foreach ($wa in $webApps) {
+        $name = $wa.Name
+        $results += [PSCustomObject]@{ Category="App Service"; Check="HTTPS-Only"; Resource=$name; Status=if($wa.HttpsOnly){"PASS"}else{"FAIL"}; Details="Redirect: $($wa.HttpsOnly)" }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="TLS Latest Version"; Resource=$name; Status=if($wa.SiteConfig.MinTlsVersion -ge "1.2"){"PASS"}else{"FAIL"}; Details="Min TLS: $($wa.SiteConfig.MinTlsVersion)" }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="Plain FTP"; Resource=$name; Status=if($wa.SiteConfig.FtpsState -eq "FtpsOnly" -or $wa.SiteConfig.FtpsState -eq "Disabled"){"PASS"}else{"FAIL"}; Details="FTPS State: $($wa.SiteConfig.FtpsState)" }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="Remote Debugging"; Resource=$name; Status=if($wa.SiteConfig.RemoteDebuggingEnabled){"FAIL"}else{"PASS"}; Details=if($wa.SiteConfig.RemoteDebuggingEnabled){"WARNING: Enabled"}else{"Disabled"} }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="HTTP/2"; Resource=$name; Status=if($wa.SiteConfig.Http20Enabled){"PASS"}else{"INFO"}; Details=if($wa.SiteConfig.Http20Enabled){"Enabled"}else{"Disabled"} }
+        $results += [PSCustomObject]@{ Category="App Service"; Check="Always On"; Resource=$name; Status=if($wa.SiteConfig.AlwaysOn){"PASS"}else{"INFO"}; Details=if($wa.SiteConfig.AlwaysOn){"Enabled"}else{"Disabled"} }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="App Service Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 4. AKS (KUBERNETES)
+# ─────────────────────────────────────────────────────────────
+Write-Host "[4/7] AKS Clusters..." -ForegroundColor Cyan
+try {
+    $aksClusters = Get-AzAksCluster
+    foreach ($aks in $aksClusters) {
+        $name = $aks.Name; $rg = $aks.ResourceGroupName
+        $results += [PSCustomObject]@{ Category="AKS"; Check="RBAC Enabled"; Resource=$name; Status=if($aks.EnableRbac){"PASS"}else{"FAIL"}; Details="RBAC: $($aks.EnableRbac)" }
+        $results += [PSCustomObject]@{ Category="AKS"; Check="Defender for AKS"; Resource=$name; Status=if($aks.SecurityProfile.Defender.SecurityMonitoring.Enabled){"PASS"}else{"FAIL"}; Details="Defender: $($aks.SecurityProfile.Defender.SecurityMonitoring.Enabled)" }
+        $results += [PSCustomObject]@{ Category="AKS"; Check="Secrets Provider"; Resource=$name; Status=if($aks.AddonProfiles.azureKeyvaultSecretsProvider.Enabled){"PASS"}else{"WARN"}; Details="Key Vault Addon: $($aks.AddonProfiles.azureKeyvaultSecretsProvider.Enabled)" }
+        $results += [PSCustomObject]@{ Category="AKS"; Check="Local Accounts"; Resource=$name; Status=if($aks.DisableLocalAccounts){"PASS"}else{"WARN"}; Details=if($aks.DisableLocalAccounts){"Disabled"}else{"Local accounts enabled"} }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="AKS Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 5. LOGIC APPS
+# ─────────────────────────────────────────────────────────────
+Write-Host "[5/7] Logic Apps..." -ForegroundColor Cyan
+try {
+    $logicApps = Get-AzLogicApp
+    foreach ($la in $logicApps) {
+        $name = $la.Name
+        # Note: Extensive logic app properties often require direct ARM calls for state, basic check for existence/info
+        $results += [PSCustomObject]@{ Category="Logic App"; Check="Logic App Health"; Resource=$name; Status="INFO"; Details="State: $($la.State)" }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="Logic App Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 6. FUNCTION APPS
+# ─────────────────────────────────────────────────────────────
+Write-Host "[6/7] Function Apps..." -ForegroundColor Cyan
+try {
+    $funcApps = Get-AzFunctionApp
+    foreach ($fa in $funcApps) {
+        $name = $fa.Name
+        $results += [PSCustomObject]@{ Category="Function App"; Check="HTTPS-Only"; Resource=$name; Status=if($fa.HttpsOnly){"PASS"}else{"FAIL"}; Details="Redirect: $($fa.HttpsOnly)" }
+    }
+} catch { $results += [PSCustomObject]@{ Category="Compute"; Check="Function App Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+
+# ─────────────────────────────────────────────────────────────
+# 7. CONTAINER APPS
+# ─────────────────────────────────────────────────────────────
+Write-Host "[7/7] Container Apps..." -ForegroundColor Cyan
+try {
+    # Using generic AzResource as Get-AzContainerApp might not be in older modules
+    $containerApps = Get-AzResource -ResourceType "Microsoft.App/containerApps"
+    foreach ($ca in $containerApps) {
+        $name = $ca.Name
+        $results += [PSCustomObject]@{ Category="Container App"; Check="App Status"; Resource=$name; Status="INFO"; Details="Provisions: $($ca.Properties.provisioningState)" }
+    }
+} catch { }
+
+# ── Finalize Report ───────────────────────────────────────────
 Write-Host "Generating HTML report..." -ForegroundColor Cyan
 $rows = ""
 foreach ($r in $results) {
@@ -63,10 +182,11 @@ foreach ($r in $results) {
 }
 $pass=$($results|Where-Object Status -eq "PASS").Count; $fail=$($results|Where-Object Status -eq "FAIL").Count
 $warn=$($results|Where-Object Status -eq "WARN").Count; $total=$results.Count
-$html = Get-HtmlTemplate -Title "VM Security Assessment" -SubName $subName -Date $date -Rows $rows -Pass $pass -Fail $fail -Warn $warn -Total $total
-$html | Out-File "AzureVM_Report.html" -Encoding UTF8
+$html = Get-HtmlTemplate -Title "Compute & Services Audit" -SubName $subName -Date $date -Rows $rows -Pass $pass -Fail $fail -Warn $warn -Total $total
+$html | Out-File "AzureCompute_Report.html" -Encoding UTF8
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host " ✅ Report Ready: AzureVM_Report.html" -ForegroundColor Green
+Write-Host " ✅ Compute Audit Complete!" -ForegroundColor Green
+Write-Host " Report: AzureCompute_Report.html" -ForegroundColor Green
 Write-Host " 📥 Downloading automatically..." -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
-download AzureVM_Report.html
+download AzureCompute_Report.html

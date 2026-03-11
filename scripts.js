@@ -37,9 +37,9 @@ const CHECKLISTS = {
 
     vm: {
         title: "Compute Audit",
-        desc: "Audits disk encryption, Defender, managed identity & JIT access",
+        desc: "Comprehensive security audit for VMs, scale sets, App Services, AKS, Logic/Function Apps & Container Apps",
         file: "VM_Audit.ps1",
-        report: "AzureVM_Report.html",
+        report: "AzureCompute_Report.html",
         color: "#9b59b6"
     },
 
