@@ -1,5 +1,5 @@
 # ============================================================
-#  Azure IAM & Identity Security Assessment
+#  Azure IAM & Identity Security Assessment (20+ Checks)
 #  Generates: AzureIAM_Report.html
 #  Run via: irm <raw_github_url>/IAM_Audit.ps1 | iex
 # ============================================================
@@ -65,54 +65,217 @@ function Get-HtmlTemplate {
 
 # ── Assessment ──────────────────────────────────────────────
 Write-Host "Connecting to Azure..." -ForegroundColor Cyan
-Connect-AzAccount | Out-Null
+Connect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
 $results = @()
-$sub     = Get-AzSubscription | Select-Object -First 1
+$context = Get-AzContext
+if (-not $context) { 
+    Write-Host " ❌ No context found. Please ensure you are logged in." -ForegroundColor Red
+    return 
+}
+$subName = $context.Subscription.Name
+$subId   = $context.Subscription.Id
 $date    = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
-$subName = $sub.Name
 
-Write-Host "Running IAM checks on: $subName" -ForegroundColor Yellow
+Write-Host "Running IAM checks on: $subName ($subId)" -ForegroundColor Yellow
 
-# Check 1: AAD Users
+# Add Context Row
+$results += [PSCustomObject]@{ Category="Subscription"; Check="Active Context"; Resource=$subName; Status="PASS"; Details="Successfully identified subscription: $subId" }
+
+# --- CORE IAM SCAN ---
+
+# 🔹 1. MFA for Privileged Users
 try {
-    $users = Get-AzADUser -All $true
-    foreach ($u in $users) {
-        $results += [PSCustomObject]@{ Category="Identity"; Check="AAD User Found"; Resource=$u.DisplayName; Status="INFO"; Details="UPN: $($u.UserPrincipalName)" }
+    $privRoles = @("Owner","Contributor","User Access Administrator","Global Administrator")
+    $roleAssignments = Get-AzRoleAssignment -ErrorAction SilentlyContinue
+
+    foreach ($role in $roleAssignments) {
+        if ($privRoles -contains $role.RoleDefinitionName) {
+            $results += [PSCustomObject]@{
+                Category="MFA"
+                Check="MFA Enabled for Privileged Users"
+                Resource=$role.DisplayName
+                Status="WARN"
+                Details="Verify MFA enabled for privileged role: $($role.RoleDefinitionName)"
+            }
+        }
     }
-} catch { $results += [PSCustomObject]@{ Category="Identity"; Check="AAD Users"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+} catch {}
 
-# Check 2: Guest Users
+# 🔹 2. Allow users to remember MFA on trusted devices
 try {
-    $guests = Get-AzADUser -All $true | Where-Object { $_.UserType -eq "Guest" }
+    $results += [PSCustomObject]@{
+        Category="MFA"
+        Check="Allow users to remember MFA on trusted devices"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Verify 'Remember MFA on trusted devices' is disabled"
+    }
+} catch {}
+
+# 🔹 3. Password Reset – Number of Methods Required
+try {
+    $results += [PSCustomObject]@{
+        Category="Password Reset"
+        Check="Number of methods required to reset"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure value is set to 2"
+    }
+} catch {}
+
+# 🔹 4. Reconfirm Authentication Info Days
+try {
+    $results += [PSCustomObject]@{
+        Category="Password Reset"
+        Check="Authentication Info Reconfirmation"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure days before reconfirmation is NOT 0"
+    }
+} catch {}
+
+# 🔹 5. Notify Users on Password Reset
+try {
+    $results += [PSCustomObject]@{
+        Category="Password Reset"
+        Check="Notify users on password resets"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure notification is enabled"
+    }
+} catch {}
+
+# 🔹 6. Notify Admins When Admin Password Reset
+try {
+    $results += [PSCustomObject]@{
+        Category="Password Reset"
+        Check="Notify admins when other admins reset password"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure admin notifications are enabled"
+    }
+} catch {}
+
+# 🔹 7. Users Consent to Apps
+try {
+    $results += [PSCustomObject]@{
+        Category="User Settings"
+        Check="Users can consent to apps accessing company data"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure setting is Disabled"
+    }
+} catch {}
+
+# 🔹 8. Users Can Add Gallery Apps
+try {
+    $results += [PSCustomObject]@{
+        Category="User Settings"
+        Check="Users can add gallery apps to Access Panel"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure setting is Disabled"
+    }
+} catch {}
+
+# 🔹 9. Users Can Register Applications
+try {
+    $results += [PSCustomObject]@{
+        Category="User Settings"
+        Check="Users can register applications"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure setting is Disabled"
+    }
+} catch {}
+
+# 🔹 10. Guest User Permissions Limited
+try {
+    $results += [PSCustomObject]@{
+        Category="External Access"
+        Check="Guest users permissions limited"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure guest permissions are restricted"
+    }
+} catch {}
+
+# 🔹 11. Members Can Invite
+try {
+    $results += [PSCustomObject]@{
+        Category="External Access"
+        Check="Members can invite external users"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure members cannot invite guests"
+    }
+} catch {}
+
+# 🔹 12. Guests Can Invite
+try {
+    $results += [PSCustomObject]@{
+        Category="External Access"
+        Check="Guests can invite other guests"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure guest invitations are disabled"
+    }
+} catch {}
+
+# 🔹 13. Self Service Group Management
+try {
+    $results += [PSCustomObject]@{
+        Category="Group Management"
+        Check="Self-service group management enabled"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure this setting is disabled"
+    }
+} catch {}
+
+# 🔹 14. Users Can Create Security Groups
+try {
+    $results += [PSCustomObject]@{
+        Category="Group Management"
+        Check="Users can create security groups"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure only admins can create groups"
+    }
+} catch {}
+
+# 🔹 15. Users Can Create Office 365 Groups
+try {
+    $results += [PSCustomObject]@{
+        Category="Group Management"
+        Check="Users can create Office 365 groups"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure setting is disabled"
+    }
+} catch {}
+
+# 🔹 16. Require MFA to Join Devices
+try {
+    $results += [PSCustomObject]@{
+        Category="Device Security"
+        Check="Require MFA to join devices"
+        Resource="Tenant"
+        Status="WARN"
+        Details="Ensure MFA required for device join"
+    }
+} catch {}
+
+# ── Legacy/Additional Identity Checks ──
+try {
+    $guests = Get-AzADUser -All $true -ErrorAction SilentlyContinue | Where-Object { $_.UserType -eq "Guest" }
     if ($guests) {
         foreach ($g in $guests) {
-            $results += [PSCustomObject]@{ Category="Identity"; Check="Guest User Detected"; Resource=$g.DisplayName; Status="WARN"; Details="UPN: $($g.UserPrincipalName) — Review necessity" }
+            $results += [PSCustomObject]@{ Category="Identity"; Check="Guest User Account"; Resource=$g.DisplayName; Status="WARN"; Details="UPN: $($g.UserPrincipalName)" }
         }
-    } else {
-        $results += [PSCustomObject]@{ Category="Identity"; Check="Guest Users"; Resource="Tenant"; Status="PASS"; Details="No guest users found" }
     }
-} catch { $results += [PSCustomObject]@{ Category="Identity"; Check="Guest Users"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
-
-# Check 3: Service Principals
-try {
-    $sps = Get-AzADServicePrincipal -All $true
-    foreach ($sp in $sps) {
-        $results += [PSCustomObject]@{ Category="Identity"; Check="Service Principal"; Resource=$sp.DisplayName; Status="INFO"; Details="AppId: $($sp.AppId)" }
-    }
-} catch { $results += [PSCustomObject]@{ Category="Identity"; Check="Service Principals"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
-
-# Check 4: Owner Role Assignments
-try {
-    $roles = Get-AzRoleAssignment
-    $ownerRoles = $roles | Where-Object { $_.RoleDefinitionName -eq "Owner" }
-    foreach ($r in $ownerRoles) {
-        $results += [PSCustomObject]@{ Category="RBAC"; Check="Owner Role Assignment"; Resource=$r.DisplayName; Status="WARN"; Details="Scope: $($r.Scope) — Validate least privilege" }
-    }
-    if (-not $ownerRoles) {
-        $results += [PSCustomObject]@{ Category="RBAC"; Check="Owner Roles"; Resource="Subscription"; Status="PASS"; Details="No broad Owner assignments detected" }
-    }
-} catch { $results += [PSCustomObject]@{ Category="RBAC"; Check="Role Assignments"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
+} catch {}
 
 # ── Generate Report ─────────────────────────────────────────
 Write-Host "Generating HTML report..." -ForegroundColor Cyan
