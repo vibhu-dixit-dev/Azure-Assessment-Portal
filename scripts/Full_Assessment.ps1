@@ -37,12 +37,21 @@ $results += [PSCustomObject]@{ Category="Subscription"; Check="Active Context"; 
 # ── IAM
 Write-Host "[1/6] IAM Checks..." -ForegroundColor Cyan
 try {
-    # MFA Sampling
+    # 1. Fetch Authorization Policy
+    $authPolicy = Invoke-AzRestMethod -Method GET -Url "https://graph.microsoft.com/v1.0/policies/authorizationPolicy/authorizationPolicy"
+    if ($authPolicy.StatusCode -eq 200) {
+        $p = $authPolicy.Content | ConvertFrom-Json
+        $results += [PSCustomObject]@{ Category="IAM"; Check="Guest Permissions"; Resource="Tenant"; Status=if($p.guestUserRoleAllowedToReadOtherUsers){"FAIL"}else{"PASS"}; Details=if($p.guestUserRoleAllowedToReadOtherUsers){"Guests can read other users."}else{"Guest access restricted."} }
+        $results += [PSCustomObject]@{ Category="IAM"; Check="App Registration"; Resource="Tenant"; Status=if($p.allowedToCreateApps){"FAIL"}else{"PASS"}; Details=if($p.allowedToCreateApps){"Users can register apps."}else{"Restricted to admins."} }
+    }
+
+    # 2. Privileged MFA (Sampling)
     $privRoles = @("Owner","Global Administrator")
     $roleAssignments = Get-AzRoleAssignment -ErrorAction SilentlyContinue | Where-Object { $privRoles -contains $_.RoleDefinitionName }
     foreach ($role in $roleAssignments) {
         $results += [PSCustomObject]@{ Category="IAM"; Check="Privileged MFA"; Resource=$role.DisplayName; Status="WARN"; Details="Verify MFA for $($role.RoleDefinitionName)" }
     }
+} catch { $results += [PSCustomObject]@{ Category="IAM"; Check="IAM Scan"; Resource="N/A"; Status="ERROR"; Details=$_.Exception.Message } }
     
     # Password Reset & External Access
     $results += [PSCustomObject]@{ Category="IAM"; Check="Guest Invitations"; Resource="Tenant"; Status="WARN"; Details="Restrict guest & member invitation capabilities" }
