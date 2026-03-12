@@ -68,11 +68,13 @@ Write-Host "Checking for required Azure modules..." -ForegroundColor Cyan
 if (-not (Get-Module -ListAvailable -Name Az.Storage)) {
     Write-Host "Installing Az.Storage module..." -ForegroundColor Yellow
     Install-Module -Name Az.Storage -AllowClobber -Force -Scope CurrentUser
+    Import-Module -Name Az.Storage -Force
 } else {
     # Check if Get-AzStorageAccountSasPolicy exists, if not update
     if (-not (Get-Command Get-AzStorageAccountSasPolicy -ErrorAction SilentlyContinue)) {
         Write-Host "Updating Az.Storage module to support SAS Policy cmdlets..." -ForegroundColor Yellow
         Update-Module -Name Az.Storage -Force -ErrorAction SilentlyContinue
+        Import-Module -Name Az.Storage -Force
     }
 }
 
@@ -194,8 +196,15 @@ Details="Unable to verify key rotation"
 }
 }
 
-# Fetch SAS Policy
-$policy = Get-AzStorageAccountSasPolicy -ResourceGroupName $rg -StorageAccountName $name -ErrorAction SilentlyContinue
+# Fetch SAS Policy (Safe execution)
+$policy = $null
+if (Get-Command Get-AzStorageAccountSasPolicy -ErrorAction SilentlyContinue) {
+    try {
+        $policy = Get-AzStorageAccountSasPolicy -ResourceGroupName $rg -StorageAccountName $name -ErrorAction Stop
+    } catch {
+        $policy = $null
+    }
+}
 
 # SAS Expiry
 if($policy -and $policy.SasExpirationPeriod){
