@@ -67,9 +67,13 @@ function selectCard(el) {
     selectedKey = el.dataset.checklist;
 
     // Handle Premium Card Redirect
-    if (selectedKey === 'defender') {
-        const subject = encodeURIComponent("Inquiry regarding Premium Defender & Monitoring Checklist");
-        const body = encodeURIComponent("Hello Vibhu,\n\nI am interested in the Premium Defender & Monitoring assessment checklist. Please provide more details.\n\nThank you.");
+    if (selectedKey === 'defender' || selectedKey === 'iam' || selectedKey === 'full') {
+        let checklistName = selectedKey === 'defender' ? 'Defender & Monitoring'
+            : selectedKey === 'iam' ? 'IAM & Identity'
+                : 'Full Compliance';
+
+        const subject = encodeURIComponent("Inquiry regarding Premium " + checklistName + " Checklist");
+        const body = encodeURIComponent("Hello Vibhu,\n\nI am interested in the Premium " + checklistName + " assessment checklist. Please provide more details.\n\nThank you.");
         window.location.href = `mailto:vibhu.dixit@onmeridian.com?subject=${subject}&body=${body}`;
         return;
     }
