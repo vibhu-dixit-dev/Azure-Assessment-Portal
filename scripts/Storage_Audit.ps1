@@ -64,6 +64,18 @@ function Get-HtmlTemplate {
 }
 
 # ── Assessment ──────────────────────────────────────────────
+Write-Host "Checking for required Azure modules..." -ForegroundColor Cyan
+if (-not (Get-Module -ListAvailable -Name Az.Storage)) {
+    Write-Host "Installing Az.Storage module..." -ForegroundColor Yellow
+    Install-Module -Name Az.Storage -AllowClobber -Force -Scope CurrentUser
+} else {
+    # Check if Get-AzStorageAccountSasPolicy exists, if not update
+    if (-not (Get-Command Get-AzStorageAccountSasPolicy -ErrorAction SilentlyContinue)) {
+        Write-Host "Updating Az.Storage module to support SAS Policy cmdlets..." -ForegroundColor Yellow
+        Update-Module -Name Az.Storage -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Write-Host "Connecting to Azure..." -ForegroundColor Cyan
 Connect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
