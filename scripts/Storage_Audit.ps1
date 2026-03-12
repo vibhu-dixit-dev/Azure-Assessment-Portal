@@ -148,32 +148,84 @@ Details=if($sa.Encryption.Services.File.Enabled){"File encryption enabled"}else{
 
 # Access Key Rotation
 try{
-Get-AzStorageAccountKey -ResourceGroupName $rg -Name $name | Out-Null
+$keys = Get-AzStorageAccountKey -ResourceGroupName $rg -Name $name
+
+$rotationIssue = $false
+$details = ""
+
+foreach($key in $keys){
+    if($key.CreationTime){
+        $age = (Get-Date) - $key.CreationTime
+        if($age.Days -gt 90){
+            $rotationIssue = $true
+        }
+        $details += "$($key.KeyName) age: $($age.Days) days; "
+    }
+}
+
+$status = if($rotationIssue){"FAIL"}else{"PASS"}
+
+$results += [PSCustomObject]@{
+Category="Storage"
+Check="Storage access key rotation"
+Resource=$name
+Status=$status
+Details=$details
+}
+}catch{
 $results += [PSCustomObject]@{
 Category="Storage"
 Check="Storage access key rotation"
 Resource=$name
 Status="WARN"
-Details="Manual verification required"
+Details="Unable to verify key rotation"
 }
-}catch{}
+}
+
+# Fetch SAS Policy
+$policy = Get-AzStorageAccountSasPolicy -ResourceGroupName $rg -StorageAccountName $name -ErrorAction SilentlyContinue
 
 # SAS Expiry
+if($policy -and $policy.SasExpirationPeriod){
+    if([timespan]$policy.SasExpirationPeriod -le [timespan]"01:00:00"){
+        $status="PASS"
+    }
+    else{
+        $status="FAIL"
+    }
+    $detail="SAS expiration policy: $($policy.SasExpirationPeriod)"
+}
+else{
+    $status="WARN"
+    $detail="No SAS expiration policy configured"
+}
+
 $results += [PSCustomObject]@{
 Category="Storage"
 Check="SAS token expiry"
 Resource=$name
-Status="WARN"
-Details="Ensure SAS tokens expire within 1 hour"
+Status=$status
+Details=$detail
 }
 
 # SAS HTTPS
-$results += [PSCustomObject]@{
-Category="Storage"
-Check="SAS HTTPS enforcement"
-Resource=$name
-Status=if($sa.EnableHttpsTrafficOnly){"PASS"}else{"FAIL"}
-Details="SAS should only allow HTTPS"
+if($policy){
+    $httpsOnly = $policy.Protocol -eq "Https"
+    $results += [PSCustomObject]@{
+    Category="Storage"
+    Check="SAS HTTPS enforcement"
+    Resource=$name
+    Status=if($httpsOnly){"PASS"}else{"FAIL"}
+    Details="SAS tokens must allow HTTPS only"
+    }
+}else{
+    $results += [PSCustomObject]@{
+    Category="Storage"
+    Check="SAS HTTPS enforcement"
+    Resource=$name
+    Status="WARN"
+    Details="Could not read SAS policy or no policy defined."
+    }
 }
 
 # Blob Containers Public Access
