@@ -3,67 +3,84 @@
 #  Generates: AzureStorage_Report.html
 # ============================================================
 
+# ── HTML Template Function ──────────────────────────────────
 function Get-HtmlTemplate {
-    param($Title,$SubName,$Date,$Rows,$Pass,$Fail,$Warn,$Total)
-
+    param($Title, $SubName, $Date, $Rows, $Pass, $Fail, $Warn, $Total)
     $score = if ($Total -gt 0) { [math]::Round(($Pass / $Total) * 100) } else { 0 }
     $scoreColor = if ($score -ge 80) { "#00c87a" } elseif ($score -ge 60) { "#ffab40" } else { "#ff4d6d" }
-
-@"
+    
+    return @"
 <!DOCTYPE html>
 <html lang='en'>
 <head>
-<meta charset='UTF-8'>
-<title>Azure Assessment - $Title</title>
-<style>
-body{font-family:'Segoe UI';background:#0a0e1a;color:#e8eaf0;padding:30px}
-.container{max-width:1200px;margin:auto}
-.header{background:linear-gradient(135deg,#0078D4,#003f73);padding:30px;border-radius:12px;margin-bottom:25px}
-.score{font-size:28px;font-weight:bold;color:$scoreColor}
-table{width:100%;border-collapse:collapse;background:#111}
-th,td{padding:12px;border-bottom:1px solid #333}
-th{background:#003f73}
-</style>
+    <meta charset='UTF-8'>
+    <title>Azure Assessment - $Title</title>
+    <link rel="icon" type="image/png" href="Screenshot_2026-03-10_201227-removebg-preview.png">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:#0a0e1a;color:#e8eaf0;min-height:100vh;padding:30px}
+        .container{max-width:1200px;margin:0 auto}
+        .header{background:linear-gradient(135deg,#0078D4,#003f73);border-radius:16px;padding:32px 36px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+        .header h1{font-size:1.7rem;font-weight:800}
+        .header p{font-size:0.85rem;opacity:.75;margin-top:6px}
+        .score-circle{width:90px;height:90px;border-radius:50%;background:conic-gradient($scoreColor ${score}%, rgba(255,255,255,0.1) 0);display:flex;align-items:center;justify-content:center;flex-direction:column;position:relative}
+        .score-inner{width:72px;height:72px;border-radius:50%;background:#0d1a2e;display:flex;align-items:center;justify-content:center;flex-direction:column;position:absolute}
+        .score-num{font-size:1.3rem;font-weight:800;color:$scoreColor}
+        .score-label{font-size:0.6rem;color:#8892a4;text-transform:uppercase;letter-spacing:.05em}
+        .summary-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:28px}
+        .sum-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center}
+        .sum-card .num{font-size:2rem;font-weight:800;margin-bottom:4px}
+        .sum-card .lbl{font-size:0.75rem;color:#8892a4;text-transform:uppercase;letter-spacing:.06em}
+        .pass .num{color:#00c87a} .fail .num{color:#ff4d6d} .warn .num{color:#ffab40} .total .num{color:#50e6ff}
+        table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:12px;overflow:hidden}
+        th{background:rgba(0,120,212,0.35);padding:12px 16px;text-align:left;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#b0c4de}
+        td{padding:11px 16px;font-size:0.85rem;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top}
+        tr:last-child td{border-bottom:none}
+        tr:hover td{background:rgba(0,120,212,0.07)}
+        .footer{text-align:center;margin-top:30px;font-size:0.8rem;color:#4a5568;padding:16px}
+    </style>
 </head>
 <body>
 <div class='container'>
-<div class='header'>
-<h2>☁ Azure $Title</h2>
-<p>Subscription: $SubName | Generated: $Date</p>
-<div class='score'>Security Score: ${score}%</div>
-</div>
-
-<p>Total Checks: $Total | Passed: $Pass | Failed: $Fail | Warnings: $Warn</p>
-
-<table>
-<thead>
-<tr>
-<th>Category</th>
-<th>Check</th>
-<th>Resource</th>
-<th>Status</th>
-<th>Details</th>
-</tr>
-</thead>
-<tbody>
-$Rows
-</tbody>
-</table>
+    <div class='header'>
+        <div><h1>☁ Azure $Title</h1><p>Subscription: $SubName &nbsp;|&nbsp; Generated: $Date</p></div>
+        <div class='score-circle'><div class='score-inner'><span class='score-num'>${score}%</span><span class='score-label'>Score</span></div></div>
+    </div>
+    <div class='summary-cards'>
+        <div class='sum-card total'><div class='num'>$Total</div><div class='lbl'>Total Checks</div></div>
+        <div class='sum-card pass'><div class='num'>$Pass</div><div class='lbl'>Passed</div></div>
+        <div class='sum-card fail'><div class='num'>$Fail</div><div class='lbl'>Failed</div></div>
+        <div class='sum-card warn'><div class='num'>$Warn</div><div class='lbl'>Warnings</div></div>
+    </div>
+    <table>
+        <thead><tr><th>Category</th><th>Check</th><th>Resource</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody>$Rows</tbody>
+    </table>
+    <div class='footer'>Azure Cloud Assessment Report &nbsp;|&nbsp; Generated by PowerShell Automation</div>
 </div>
 </body>
 </html>
 "@
 }
 
+# ── Assessment ──────────────────────────────────────────────
 Write-Host "Connecting to Azure..." -ForegroundColor Cyan
-Connect-AzAccount | Out-Null
+Connect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
-$results=@()
-$sub = Get-AzSubscription | Select-Object -First 1
-$subName = $sub.Name
-$date = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
+$results = @()
+$context = Get-AzContext
+if (-not $context) { 
+    Write-Host " ❌ No context found. Please ensure you are logged in." -ForegroundColor Red
+    return 
+}
+$subName = $context.Subscription.Name
+$subId   = $context.Subscription.Id
+$date    = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd HH:mm")
 
-Write-Host "Running Storage checks on $subName" -ForegroundColor Yellow
+Write-Host "Running Storage checks on: $subName ($subId)" -ForegroundColor Yellow
+
+# Add Context Row
+$results += [PSCustomObject]@{ Category="Subscription"; Check="Active Context"; Resource=$subName; Status="PASS"; Details="Successfully identified subscription: $subId" }
 
 try {
 
@@ -219,29 +236,13 @@ Details=$_.Exception.Message
 
 }
 
+# ── Generate Report ─────────────────────────────────────────
 Write-Host "Generating HTML report..." -ForegroundColor Cyan
-
-$rows=""
-
-foreach($r in $results){
-
-$color = switch ($r.Status){
-"PASS"{"#00c87a"}
-"FAIL"{"#ff4d6d"}
-"WARN"{"#ffab40"}
-"INFO"{"#50e6ff"}
-default{"#8892a4"}
-}
-
-$icon = switch ($r.Status){
-"PASS"{"✔"}
-"FAIL"{"✘"}
-"WARN"{"⚠"}
-default{"ℹ"}
-}
-
-$rows += "<tr><td>$($r.Category)</td><td>$($r.Check)</td><td>$($r.Resource)</td><td style='color:$color;font-weight:bold'>$icon $($r.Status)</td><td>$($r.Details)</td></tr>"
-
+$rows = ""
+foreach ($r in $results) {
+    $color = switch ($r.Status) { "PASS"{"#00c87a"} "FAIL"{"#ff4d6d"} "WARN"{"#ffab40"} "INFO"{"#50e6ff"} default{"#8892a4"} }
+    $icon  = switch ($r.Status) { "PASS"{"✔"} "FAIL"{"✘"} "WARN"{"⚠"} default{"ℹ"} }
+    $rows += "<tr><td>$($r.Category)</td><td>$($r.Check)</td><td>$($r.Resource)</td><td style='color:$color;font-weight:700'>$icon $($r.Status)</td><td>$($r.Details)</td></tr>"
 }
 
 $pass = ($results | Where-Object Status -eq "PASS").Count
@@ -250,11 +251,11 @@ $warn = ($results | Where-Object Status -eq "WARN").Count
 $total = $results.Count
 
 $html = Get-HtmlTemplate -Title "Storage Security Audit" -SubName $subName -Date $date -Rows $rows -Pass $pass -Fail $fail -Warn $warn -Total $total
-
 $html | Out-File "AzureStorage_Report.html" -Encoding UTF8
 
-Write-Host "===================================="
-Write-Host "✅ Report Ready: AzureStorage_Report.html"
-Write-Host "===================================="
-
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host " ✅ Report Ready: AzureStorage_Report.html" -ForegroundColor Green
+Write-Host " 📥 Downloading automatically..." -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
 download AzureStorage_Report.html
